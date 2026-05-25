@@ -1,6 +1,6 @@
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../chat/chat_message.dart';
@@ -21,7 +21,6 @@ class SqlCipherChatRepository implements ChatRepository {
   Future<void> init() async {
     if (_db != null && _cipher != null) return;
 
-    final dbKey = await _keyStore.getOrCreateDatabaseKey();
     final messageKey = await _keyStore.getOrCreateMessageKey();
     _cipher = MessageCipher(messageKey);
 
@@ -30,7 +29,6 @@ class SqlCipherChatRepository implements ChatRepository {
 
     _db = await openDatabase(
       dbPath,
-      password: dbKey,
       version: 1,
       onCreate: (db, version) async {
         await db.execute('''
