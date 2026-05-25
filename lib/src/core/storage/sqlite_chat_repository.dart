@@ -1,6 +1,6 @@
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite_sqlcipher/sqflite.dart';
+import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
 import '../chat/chat_message.dart';
@@ -8,8 +8,8 @@ import '../chat/chat_repository.dart';
 import 'message_cipher.dart';
 import 'secure_key_store.dart';
 
-class SqlCipherChatRepository implements ChatRepository {
-  SqlCipherChatRepository(this._keyStore);
+class SqliteChatRepository implements ChatRepository {
+  SqliteChatRepository(this._keyStore);
 
   final SecureKeyStore _keyStore;
   final Uuid _uuid = const Uuid();
@@ -21,16 +21,16 @@ class SqlCipherChatRepository implements ChatRepository {
   Future<void> init() async {
     if (_db != null && _cipher != null) return;
 
-    final dbKey = await _keyStore.getOrCreateDatabaseKey();
     final messageKey = await _keyStore.getOrCreateMessageKey();
     _cipher = MessageCipher(messageKey);
 
     final docsDir = await getApplicationDocumentsDirectory();
-    final dbPath = p.join(docsDir.path, 'offline_assistant_secure.db');
+    final dbPath = p.join(docsDir.path, 'offline_assistant_messages.db');
+    // Database-level SQLCipher encryption was removed with the plugin migration.
+    // Message content remains encrypted at rest via MessageCipher.
 
     _db = await openDatabase(
       dbPath,
-      password: dbKey,
       version: 1,
       onCreate: (db, version) async {
         await db.execute('''

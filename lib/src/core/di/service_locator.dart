@@ -7,7 +7,7 @@ import '../network_audit.dart';
 import '../settings/secure_settings_repository.dart';
 import '../settings/settings_repository.dart';
 import '../storage/secure_key_store.dart';
-import '../storage/sqlcipher_chat_repository.dart';
+import '../storage/sqlite_chat_repository.dart';
 import '../security/privacy_guard.dart';
 
 final sl = GetIt.instance;
@@ -20,7 +20,7 @@ Future<void> configureDependencies() async {
 
   sl.registerLazySingleton<SecureKeyStore>(() => SecureKeyStore(sl()));
   sl.registerLazySingleton<SettingsRepository>(() => SecureSettingsRepository(sl()));
-  sl.registerLazySingleton<ChatRepository>(() => SqlCipherChatRepository(sl()));
+  sl.registerLazySingleton<ChatRepository>(() => SqliteChatRepository(sl()));
 
   sl.registerSingleton<NetworkAudit>(NetworkAudit());
   sl.registerSingleton<MemoryManager>(MemoryManager());

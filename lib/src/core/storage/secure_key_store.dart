@@ -7,10 +7,7 @@ class SecureKeyStore {
 
   final FlutterSecureStorage _storage;
 
-  static const _dbKeyName = 'offline_assistant.db_encryption_key';
   static const _messageKeyName = 'offline_assistant.message_key';
-
-  Future<String> getOrCreateDatabaseKey() => _getOrCreate(_dbKeyName, length: 64);
 
   Future<String> getOrCreateMessageKey() => _getOrCreate(_messageKeyName, length: 32);
 
