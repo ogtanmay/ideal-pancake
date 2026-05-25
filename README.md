@@ -93,6 +93,18 @@ To complete runtime wiring:
 
 This repository includes Android Gradle Kotlin DSL config and app module baseline files. In this environment, Flutter SDK is not installed, so compilation/tests cannot be executed here.
 
+## GitHub Actions workflows
+
+Two workflows are included for automated build validation:
+
+- `.github/workflows/flutter-ci.yml`
+  - Runs `flutter pub get`, `flutter analyze`, and `flutter test`
+- `.github/workflows/android-build.yml`
+  - Builds release APK with `flutter build apk --release`
+  - Uploads `app-release.apk` as a workflow artifact
+
+You can trigger both from pull requests, pushes, or manually using **workflow_dispatch** in the Actions tab.
+
 When running locally:
 
 ```bash
@@ -101,4 +113,3 @@ flutter test
 flutter run -d <android-device>
 flutter build apk --release
 ```
-
