@@ -1,9 +1,7 @@
-import java.util.Properties
-
 pluginManagement {
     val flutterSdkPath =
         run {
-            val properties = Properties()
+            val properties = java.util.Properties()
             val localPropertiesFile = file("local.properties")
             require(localPropertiesFile.exists()) {
                 "local.properties file not found. Run Flutter commands to generate it."
