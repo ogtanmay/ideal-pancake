@@ -178,8 +178,9 @@ class MainActivity : FlutterActivity() {
         super.onDestroy()
         inferenceRuntime.shutdown()
     }
-}
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
+}
