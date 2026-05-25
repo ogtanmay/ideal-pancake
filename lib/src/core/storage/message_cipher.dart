@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:math';
 
 import 'package:encrypt/encrypt.dart';
@@ -29,6 +28,6 @@ class MessageCipher {
     }
     final iv = IV.fromBase64(parts[0]);
     final decrypted = _encrypter.decrypt(Encrypted.fromBase64(parts[1]), iv: iv);
-    return utf8.decode(utf8.encode(decrypted));
+    return decrypted;
   }
 }
