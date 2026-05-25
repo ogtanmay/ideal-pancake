@@ -1,17 +1,34 @@
-# Offline Assistant (Flutter + Android Kotlin)
+# Offline Assistant (Flutter + Kotlin)
 
-This repository contains a production-oriented offline Android AI assistant foundation designed for local-first privacy.
+Production-oriented Phase 1 foundation for a private Android AI operating assistant.
 
-## Core product goals implemented here
+## Phase 1 scope (implemented)
 
-- Strict offline-first architecture with privacy controls and local-only defaults
-- Agent execution stack with planning, queueing model, retries, rollback, and approval-gated sensitive actions
-- Local memory system with short-term + long-term + semantic memory and offline semantic retrieval
-- Lightweight local RAG context assembly from indexed memories
-- Flutter Material 3 multi-screen app with modern dark UI, animated responses, and streaming assistant output
-- Kotlin bridge for Android integrations (app launch, accessibility hooks, quick settings tile, voice and inference channels)
-- Network security config and app policy defaults to minimize accidental network exposure
-- GGUF model metadata registry for local model lifecycle and runtime switching
+- Clean modular Flutter architecture (`core`, `features`, repository/service layers)
+- Dependency injection with `get_it`
+- Encrypted local chat persistence (SQLCipher + app-keystore-managed keys)
+- Strict offline privacy policy manager with persistent settings
+- Local network audit data model + monitor UI
+- Agent framework foundation:
+  - action types and sensitive-action policy
+  - planner
+  - priority task queue
+  - execution manager with retries and rollback
+  - tool registry bridge to Android
+- Local memory stack:
+  - short-term, long-term, semantic memory
+  - semantic index
+  - lightweight offline RAG context injection
+- Local inference pipeline contract:
+  - model lifecycle
+  - token streaming channel
+  - cancellation
+- Native Android foundation:
+  - AccessibilityService base primitives
+  - Quick Settings tile
+  - secure activity (`FLAG_SECURE`)
+  - strict network security config
+- Premium dark UI shell with chat streaming, policy controls, model manager, privacy dashboard
 
 ## Architecture
 
@@ -19,114 +36,69 @@ This repository contains a production-oriented offline Android AI assistant foun
 lib/src/
   core/
     agent/
-      assistant_action.dart
-      task_planner.dart
-      task_queue.dart
-      execution_manager.dart
-      tool_registry.dart
-      execution_models.dart
-    memory/
-      memory_models.dart
-      semantic_index.dart
-      memory_manager.dart
-      rag_engine.dart
+    chat/
+    di/
     inference/
-      local_inference_manager.dart
-    security/
-      privacy_guard.dart
+    memory/
     model/
-      model_registry.dart
     network_audit.dart
+    permissions/
+    security/
+    settings/
+    storage/
   features/
     chat/
-      chat_controller.dart
-      chat_screen.dart
-    models/model_manager_screen.dart
-    network/network_monitor_screen.dart
-    privacy/privacy_dashboard_screen.dart
-    settings/settings_screen.dart
-    voice/voice_service.dart
-  app.dart
-lib/main.dart
-android/app/src/main/
-  AndroidManifest.xml
-  kotlin/com/example/offlineassistant/
-    MainActivity.kt
-    assistant/
-      AssistantAccessibilityService.kt
-      AssistantQuickSettingsTileService.kt
-  res/xml/
-    accessibility_service_config.xml
-    network_security_config.xml
+    models/
+    network/
+    privacy/
+    settings/
+    voice/
+android/
+  app/src/main/
+    AndroidManifest.xml
+    kotlin/com/example/offlineassistant/
+      MainActivity.kt
+      assistant/
+      runtime/
+    res/xml/
 test/
-  task_planner_test.dart
-  execution_manager_test.dart
-  memory_manager_test.dart
 ```
 
-## Safety model
+## Security posture
 
-Sensitive actions (send message, email send, social post, delete file, payment) are flagged by planner policy and require explicit user approval before execution.
+- No analytics, telemetry, or cloud AI SDK usage in codebase.
+- Chat content is encrypted before database write.
+- SQLCipher database uses key material from secure storage.
+- Sensitive task types (message send, delete, payment, social post, email send) require explicit approval.
+- Strict offline mode can disable browser research and enforce local-only operation policy.
 
-Execution manager behavior:
+## Native inference integration contract (llama.cpp)
 
-1. Build action plan from prompt + contextual memory
-2. Enforce confirmation policy
-3. Execute steps via internal tool channel
-4. Retry failed steps (`maxRetries`)
-5. Roll back already-completed steps when terminal failure occurs
-6. Persist execution traces into semantic memory for future contextual decisions
+`android/app/src/main/kotlin/com/example/offlineassistant/runtime/LlamaBridge.kt` defines JNI calls:
 
-## Local memory and retrieval
+- `nativeLoadModel(modelPath, threads, context)`
+- `nativeGenerate(prompt, memoryContext)`
+- `nativeCancel()`
 
-- `MemoryManager` stores prioritized short-term, long-term, and semantic entries
-- `SemanticIndex` performs fully offline vector-style retrieval via deterministic local embeddings
-- `RagEngine` injects relevant local context into generation prompt
+`InferenceRuntime` manages threaded execution and token streaming over Flutter `EventChannel`.
 
-## Android integrations
+To complete runtime wiring:
 
-Implemented native channels:
+1. Add llama.cpp JNI shared library as `libllama_jni.so`
+2. Implement JNI entry points matching `LlamaBridge`
+3. Provide quantized GGUF files in local storage
+4. Load model from Flutter model manager flow before first generation
 
-- `offline_assistant/tools` for internal action engine calls
-- `offline_assistant/voice` for Vosk/Piper lifecycle hooks
-- `offline_assistant/inference` for model lifecycle hooks
-- `offline_assistant/inference_stream` for token streaming transport
+## Build notes
 
-Accessibility service includes practical primitives:
+This repository includes Android Gradle Kotlin DSL config and app module baseline files. In this environment, Flutter SDK is not installed, so compilation/tests cannot be executed here.
 
-- click by text
-- input text into focused field
-- gesture tap dispatch
+When running locally:
 
-Quick Settings tile scaffold included for fast assistant activation.
-
-## Build and run
-
-1. Install Flutter stable and Android SDK
-2. Run `flutter pub get`
-3. Run `flutter run -d <android-device-id>`
-4. Release build: `flutter build apk --release`
-
-## Integrating real local inference runtime (llama.cpp + GGUF)
-
-1. Build llama.cpp JNI library for target ABIs
-2. Connect JNI calls in `MainActivity` inference handlers:
-   - `loadModel`
-   - streaming token callbacks into `EventChannel`
-   - cancellation pathway
-3. Keep model files in app-private storage or SAF-granted URI locations
-4. Use quantized models (Phi-3 Mini/Gemma 2B GGUF) for mid-range phones
-
-## Integrating voice runtime (Vosk + Piper)
-
-1. Bundle/download local STT and TTS models once
-2. Wire native voice channel methods to Vosk and Piper engines
-3. Support wake listener loop + interruptible TTS playback
-
-## Privacy posture in this repository
-
-- No Firebase, telemetry, analytics, ad SDK, or cloud AI API code included
-- Strict offline mode available in settings
-- Browser research mode is disabled by default and cannot be enabled while strict offline mode is active
-- Network inspection screen included for local audit visibility
+```bash
+flutter pub get
+flutter test
+flutter run -d <android-device>
+flutter build apk --release
+```
 

@@ -25,5 +25,16 @@ void main() {
       expect(plan.requiresConfirmation, isFalse);
       expect(plan.actions.first.type, AssistantActionType.localSearch);
     });
+
+    test('adds browser research action for research prompts', () {
+      final planner = TaskPlanner();
+
+      final plan = planner.buildPlan(prompt: 'research latest android security patch notes', context: '');
+
+      expect(
+        plan.actions.any((a) => a.type == AssistantActionType.browserResearch),
+        isTrue,
+      );
+    });
   });
 }

@@ -4,8 +4,11 @@ import 'package:flutter/foundation.dart';
 
 import '../../core/agent/execution_manager.dart';
 import '../../core/agent/execution_models.dart';
+import '../../core/agent/assistant_action.dart';
 import '../../core/agent/task_planner.dart';
+import '../../core/agent/task_queue.dart';
 import '../../core/agent/tool_registry.dart';
+import '../../core/chat/chat_repository.dart';
 import '../../core/inference/local_inference_manager.dart';
 import '../../core/memory/memory_manager.dart';
 import '../../core/memory/memory_models.dart';
@@ -26,11 +29,13 @@ class ChatController extends ChangeNotifier {
     required PrivacyGuard privacyGuard,
     required NetworkAudit networkAudit,
     required MemoryManager memoryManager,
+    required ChatRepository chatRepository,
     LocalInferenceManager? inference,
     ToolRegistry? tools,
   })  : _privacyGuard = privacyGuard,
         _networkAudit = networkAudit,
         _memory = memoryManager,
+        _chatRepository = chatRepository,
         _rag = RagEngine(memoryManager),
         _inference = inference ?? LocalInferenceManager(),
         _execution = ExecutionManager(registry: tools ?? ToolRegistry());
@@ -38,39 +43,100 @@ class ChatController extends ChangeNotifier {
   final PrivacyGuard _privacyGuard;
   final NetworkAudit _networkAudit;
   final MemoryManager _memory;
+  final ChatRepository _chatRepository;
   final RagEngine _rag;
   final LocalInferenceManager _inference;
   final ExecutionManager _execution;
   final TaskPlanner _planner = TaskPlanner();
+  final TaskQueue _taskQueue = TaskQueue();
 
   final List<ChatMessage> _messages = <ChatMessage>[];
   StreamSubscription<String>? _generation;
 
   bool _isThinking = false;
+  bool _initialized = false;
   bool get isThinking => _isThinking;
+  bool get initialized => _initialized;
 
   List<ChatMessage> get messages => List<ChatMessage>.unmodifiable(_messages);
+
+  Future<void> initialize() async {
+    if (_initialized) return;
+    final history = await _chatRepository.listRecent(limit: 150);
+    _messages
+      ..clear()
+      ..addAll(
+        history.reversed.map(
+          (m) => ChatMessage(role: m.role, text: m.content),
+        ),
+      );
+    _initialized = true;
+    notifyListeners();
+  }
 
   Future<void> submit(String prompt, {required bool approveSensitiveActions}) async {
     final input = prompt.trim();
     if (input.isEmpty) return;
 
+    await initialize();
     _messages.add(ChatMessage(role: 'user', text: input));
+    await _chatRepository.append(role: 'user', content: input);
     _remember(input, MemoryType.shortTerm, priority: 10);
 
     final memorySummary = _memory.summarizeRecent();
     final plan = _planner.buildPlan(prompt: input, context: memorySummary);
 
-    if (_privacyGuard.strictOffline &&
-        plan.actions.any((action) => action.type.name == 'browserResearch')) {
+    final browserActions = plan.actions
+        .where((action) => action.type == AssistantActionType.browserResearch)
+        .toList();
+
+    if (_privacyGuard.strictOffline && browserActions.isNotEmpty) {
       _networkAudit.log(
         endpoint: 'browserResearch',
         blocked: true,
         reason: 'Strict offline firewall mode',
       );
+      final blockedAction = browserActions.first;
+      final blockedReport = ExecutionReport(
+        success: false,
+        logs: [
+          ExecutionLogEntry(
+            action: blockedAction,
+            status: ExecutionStatus.failed,
+            timestamp: DateTime.now(),
+            message: 'Blocked by strict offline firewall mode',
+            attempt: 1,
+          ),
+        ],
+        failedAction: blockedAction,
+      );
+      _storeExecutionMemory(blockedReport);
+      await _generateAssistantResponse(
+        prompt: input,
+        executionReport: blockedReport,
+        ragContext: _rag.retrieve(input).context,
+      );
+      return;
     }
 
-    final executionReport = await _execution.run(plan, approved: approveSensitiveActions);
+    _taskQueue.enqueue(
+      QueuedTask(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        plan: plan,
+        priority: plan.requiresConfirmation ? 10 : 5,
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    final task = _taskQueue.dequeue();
+    if (task == null) {
+      return;
+    }
+
+    final executionReport = await _execution.run(
+      task.plan,
+      approved: approveSensitiveActions,
+    );
     _storeExecutionMemory(executionReport);
 
     final rag = _rag.retrieve(input);
@@ -114,6 +180,7 @@ class ChatController extends ChangeNotifier {
       notifyListeners();
     }, onDone: () {
       _messages[_messages.length - 1] = ChatMessage(role: 'assistant', text: response);
+      unawaited(_chatRepository.append(role: 'assistant', content: response));
       _remember(response, MemoryType.longTerm, priority: executionReport.success ? 6 : 8);
       _isThinking = false;
       notifyListeners();

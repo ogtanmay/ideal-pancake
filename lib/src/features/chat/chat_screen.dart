@@ -19,6 +19,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     widget.controller.addListener(_refresh);
+    widget.controller.initialize();
   }
 
   @override

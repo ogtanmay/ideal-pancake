@@ -2,6 +2,10 @@ package com.example.offlineassistant
 
 import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
+import android.view.WindowManager
+import com.example.offlineassistant.runtime.InferenceRuntime
+import com.example.offlineassistant.runtime.VoiceRuntime
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -12,6 +16,8 @@ class MainActivity : FlutterActivity() {
     private val toolChannelName = "offline_assistant/tools"
     private val inferenceChannelName = "offline_assistant/inference"
     private val streamChannelName = "offline_assistant/inference_stream"
+    private val inferenceRuntime = InferenceRuntime()
+    private val voiceRuntime = VoiceRuntime()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -26,11 +32,56 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, voiceChannelName)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "initialize" -> result.success(null)
-                    "startWakeListener" -> result.success(null)
-                    "stopWakeListener" -> result.success(null)
-                    "transcribeStreaming" -> result.success("")
-                    "speak" -> result.success(null)
+                    "initialize" -> {
+                        val voskModelPath = call.argument<String>("voskModelPath").orEmpty()
+                        val piperModelPath = call.argument<String>("piperModelPath").orEmpty()
+                        val wakeWord = call.argument<String>("wakeWord").orEmpty()
+                        runCatching {
+                            voiceRuntime.initialize(voskModelPath, piperModelPath, wakeWord)
+                        }.onSuccess {
+                            result.success(null)
+                        }.onFailure {
+                            result.error("voice_initialize_failed", it.message, null)
+                        }
+                    }
+                    "startWakeListener" -> {
+                        runCatching {
+                            voiceRuntime.startWakeListener()
+                        }.onSuccess {
+                            result.success(null)
+                        }.onFailure {
+                            result.error("voice_start_failed", it.message, null)
+                        }
+                    }
+                    "stopWakeListener" -> {
+                        runCatching {
+                            voiceRuntime.stopWakeListener()
+                        }.onSuccess {
+                            result.success(null)
+                        }.onFailure {
+                            result.error("voice_stop_failed", it.message, null)
+                        }
+                    }
+                    "transcribeStreaming" -> {
+                        runCatching {
+                            voiceRuntime.transcribeStreaming()
+                        }.onSuccess {
+                            result.success(it)
+                        }.onFailure {
+                            result.error("voice_transcribe_failed", it.message, null)
+                        }
+                    }
+                    "speak" -> {
+                        val text = call.argument<String>("text").orEmpty()
+                        val interruptible = call.argument<Boolean>("interruptible") ?: true
+                        runCatching {
+                            voiceRuntime.speak(text, interruptible)
+                        }.onSuccess {
+                            result.success(null)
+                        }.onFailure {
+                            result.error("voice_speak_failed", it.message, null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -78,8 +129,33 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, inferenceChannelName)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "loadModel" -> result.success(null)
-                    "cancelGeneration" -> result.success(null)
+                    "loadModel" -> {
+                        val modelPath = call.argument<String>("modelPath").orEmpty()
+                        val threads = call.argument<Int>("threads") ?: 4
+                        val context = call.argument<Int>("context") ?: 4096
+                        runCatching {
+                            inferenceRuntime.loadModel(modelPath, threads, context)
+                        }.onSuccess {
+                            result.success(null)
+                        }.onFailure {
+                            result.error("load_model_failed", it.message, null)
+                        }
+                    }
+                    "startGeneration" -> {
+                        val prompt = call.argument<String>("prompt").orEmpty()
+                        val memoryContext = call.argument<String>("memoryContext").orEmpty()
+                        runCatching {
+                            inferenceRuntime.startGeneration(prompt, memoryContext)
+                        }.onSuccess {
+                            result.success(null)
+                        }.onFailure {
+                            result.error("generation_failed", it.message, null)
+                        }
+                    }
+                    "cancelGeneration" -> {
+                        inferenceRuntime.cancelGeneration()
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -89,12 +165,21 @@ class MainActivity : FlutterActivity() {
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, streamChannelName)
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                    val fallback = "I am running in local mode with enterprise assistant architecture ready."
-                    fallback.split(" ").forEach { token -> events?.success("$token ") }
-                    events?.endOfStream()
+                    inferenceRuntime.attachSink(events)
                 }
 
-                override fun onCancel(arguments: Any?) = Unit
+                override fun onCancel(arguments: Any?) {
+                    inferenceRuntime.attachSink(null)
+                }
             })
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        inferenceRuntime.shutdown()
+    }
 }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+    }

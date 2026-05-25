@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/permissions/permission_manifest.dart';
 import '../../core/security/privacy_guard.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -41,29 +42,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('Strict Offline Firewall Mode'),
             subtitle: const Text('Blocks browser research mode and network-origin actions.'),
             value: widget.privacyGuard.strictOffline,
-            onChanged: widget.privacyGuard.setStrictOffline,
+            onChanged: (value) async => widget.privacyGuard.setStrictOffline(value),
           ),
           SwitchListTile(
             title: const Text('Enable Browser Research Mode'),
             subtitle: const Text('Disabled by default. Requires strict offline mode to be off.'),
             value: widget.privacyGuard.browserResearchEnabled,
-            onChanged: (value) {
+            onChanged: (value) async {
               try {
-                widget.privacyGuard.setBrowserResearchEnabled(value);
+                await widget.privacyGuard.setBrowserResearchEnabled(value);
               } catch (_) {
+                if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Disable strict offline mode first.')),
                 );
               }
             },
           ),
-          const ListTile(
-            title: Text('Permission visibility'),
-            subtitle: Text(
-              'Accessibility: app automation\n'
-              'Microphone: offline voice\n'
-              'Storage: model and document indexing\n'
-              'Notifications: smart reply assistant',
+          ...PermissionManifest.items.map(
+            (item) => ListTile(
+              leading: Icon(item.requiredForMvp ? Icons.check_circle : Icons.radio_button_unchecked),
+              title: Text(item.name),
+              subtitle: Text(item.purpose),
             ),
           ),
         ],

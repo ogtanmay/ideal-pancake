@@ -14,17 +14,39 @@ class LocalInferenceManager {
     });
   }
 
-  Stream<String> streamCompletion({required String prompt, required String memoryContext}) async* {
-    final stream = _streamChannel.receiveBroadcastStream({
-      'event': 'token_stream',
-      'prompt': prompt,
-      'memoryContext': memoryContext,
-    });
-    await for (final token in stream) {
-      if (token is String) {
-        yield token;
-      }
-    }
+  Stream<String> streamCompletion({
+    required String prompt,
+    required String memoryContext,
+  }) {
+    late final StreamController<String> controller;
+    StreamSubscription<dynamic>? sub;
+
+    controller = StreamController<String>(
+      onListen: () async {
+        sub = _streamChannel.receiveBroadcastStream().listen(
+          (event) {
+            if (event is String) controller.add(event);
+          },
+          onError: controller.addError,
+          onDone: controller.close,
+        );
+        try {
+          await _channel.invokeMethod<void>('startGeneration', {
+            'prompt': prompt,
+            'memoryContext': memoryContext,
+          });
+        } catch (e) {
+          await sub?.cancel();
+          controller.addError(e);
+          await controller.close();
+        }
+      },
+      onCancel: () async {
+        await sub?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   Future<void> cancelGeneration() {

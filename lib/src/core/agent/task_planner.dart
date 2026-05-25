@@ -60,6 +60,18 @@ class TaskPlanner {
       );
     }
 
+    if (normalized.contains('research') || normalized.contains('browse')) {
+      actions.add(
+        AssistantAction(
+          id: 'browser-research',
+          type: AssistantActionType.browserResearch,
+          payload: {
+            'url': normalized.contains('http') ? prompt : 'https://duckduckgo.com/',
+          },
+        ),
+      );
+    }
+
     if (actions.isEmpty) {
       actions.add(
         AssistantAction(
