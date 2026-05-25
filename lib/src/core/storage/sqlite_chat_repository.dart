@@ -8,8 +8,8 @@ import '../chat/chat_repository.dart';
 import 'message_cipher.dart';
 import 'secure_key_store.dart';
 
-class SqlCipherChatRepository implements ChatRepository {
-  SqlCipherChatRepository(this._keyStore);
+class SqliteChatRepository implements ChatRepository {
+  SqliteChatRepository(this._keyStore);
 
   final SecureKeyStore _keyStore;
   final Uuid _uuid = const Uuid();
@@ -26,6 +26,8 @@ class SqlCipherChatRepository implements ChatRepository {
 
     final docsDir = await getApplicationDocumentsDirectory();
     final dbPath = p.join(docsDir.path, 'offline_assistant_secure.db');
+    // Database-level SQLCipher encryption was removed with the plugin migration.
+    // Message content remains encrypted at rest via MessageCipher.
 
     _db = await openDatabase(
       dbPath,
