@@ -1,0 +1,3 @@
+-keep class com.example.offlineassistant.runtime.** { *; }
+-keep class io.flutter.embedding.** { *; }
+-keep class io.flutter.plugin.** { *; }
