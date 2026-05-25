@@ -25,7 +25,7 @@ class SqliteChatRepository implements ChatRepository {
     _cipher = MessageCipher(messageKey);
 
     final docsDir = await getApplicationDocumentsDirectory();
-    final dbPath = p.join(docsDir.path, 'offline_assistant_secure.db');
+    final dbPath = p.join(docsDir.path, 'offline_assistant_messages.db');
     // Database-level SQLCipher encryption was removed with the plugin migration.
     // Message content remains encrypted at rest via MessageCipher.
 
