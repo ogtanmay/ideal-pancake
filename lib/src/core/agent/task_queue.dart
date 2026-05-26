@@ -25,20 +25,22 @@ class TaskQueue {
       return;
     }
 
+    final reorderedTasks = ListQueue<QueuedTask>();
     var inserted = false;
-    final initialLength = _tasks.length;
-    for (var i = 0; i < initialLength; i++) {
+    while (_tasks.isNotEmpty) {
       final current = _tasks.removeFirst();
       if (!inserted && task.priority > current.priority) {
-        _tasks.addLast(task);
+        reorderedTasks.addLast(task);
         inserted = true;
       }
-      _tasks.addLast(current);
+      reorderedTasks.addLast(current);
     }
 
     if (!inserted) {
-      _tasks.addLast(task);
+      reorderedTasks.addLast(task);
     }
+
+    _tasks.addAll(reorderedTasks);
   }
 
   QueuedTask? dequeue() => _tasks.isEmpty ? null : _tasks.removeFirst();
