@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 import 'execution_models.dart';
 
 class QueuedTask {
@@ -17,7 +15,7 @@ class QueuedTask {
 }
 
 class TaskQueue {
-  final ListQueue<QueuedTask> _tasks = ListQueue<QueuedTask>();
+  final List<QueuedTask> _tasks = <QueuedTask>[];
 
   void enqueue(QueuedTask task) {
     if (_tasks.isEmpty) {
@@ -25,21 +23,17 @@ class TaskQueue {
       return;
     }
 
-    final orderedTasks = _tasks.toList();
-    var insertIndex = orderedTasks.length;
-    for (var i = 0; i < orderedTasks.length; i++) {
-      if (task.priority > orderedTasks[i].priority) {
+    var insertIndex = _tasks.length;
+    for (var i = 0; i < _tasks.length; i++) {
+      if (task.priority > _tasks[i].priority) {
         insertIndex = i;
         break;
       }
     }
-    orderedTasks.insert(insertIndex, task);
-    _tasks
-      ..clear()
-      ..addAll(orderedTasks);
+    _tasks.insert(insertIndex, task);
   }
 
-  QueuedTask? dequeue() => _tasks.isEmpty ? null : _tasks.removeFirst();
+  QueuedTask? dequeue() => _tasks.isEmpty ? null : _tasks.removeAt(0);
 
   bool get isEmpty => _tasks.isEmpty;
   int get length => _tasks.length;
