@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:encrypt/encrypt.dart';
 
 class MessageCipher {
@@ -14,9 +12,7 @@ class MessageCipher {
   final Encrypter _encrypter;
 
   String encrypt(String plainText) {
-    final random = Random.secure();
-    final ivBytes = List<int>.generate(16, (_) => random.nextInt(256));
-    final iv = IV(ivBytes);
+    final iv = IV.fromSecureRandom(16);
     final encrypted = _encrypter.encrypt(plainText, iv: iv);
     return '${iv.base64}:${encrypted.base64}';
   }

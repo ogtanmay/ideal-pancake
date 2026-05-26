@@ -25,19 +25,18 @@ class TaskQueue {
       return;
     }
 
-    var inserted = false;
-    for (var i = 0; i < _tasks.length; i++) {
-      final current = _tasks.elementAt(i);
-      if (task.priority > current.priority) {
-        _tasks.insert(i, task);
-        inserted = true;
+    final orderedTasks = _tasks.toList();
+    var insertIndex = orderedTasks.length;
+    for (var i = 0; i < orderedTasks.length; i++) {
+      if (task.priority > orderedTasks[i].priority) {
+        insertIndex = i;
         break;
       }
     }
-
-    if (!inserted) {
-      _tasks.add(task);
-    }
+    orderedTasks.insert(insertIndex, task);
+    _tasks
+      ..clear()
+      ..addAll(orderedTasks);
   }
 
   QueuedTask? dequeue() => _tasks.isEmpty ? null : _tasks.removeFirst();
